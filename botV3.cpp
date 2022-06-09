@@ -6,7 +6,7 @@
 #include <chrono>
 #include <future>
 
-//òàéìåð äëÿ òåñòà ïî ñðàâíåíèþ ñèíõðîííîãî è àñèíõðîííîãî âûïîëíåíèé
+//таймер для теста по сравнению синхронного и асинхронного выполнений
 class Timer {
 public:
 	Timer() {
@@ -21,7 +21,7 @@ private:
 	std::chrono::time_point<std::chrono::steady_clock> start, end;
 };
 
-//ñèãíóì
+//сигнум
 static int sign(int numbr) {
 	if (numbr == 0) {
 		return 0;
@@ -33,7 +33,7 @@ static int sign(int numbr) {
 }
 
 
-//êîíñòàíòíûé ìàññèâ íåàêòèâíûõ ÿ÷ååê - äëÿ îïòèìèçàöèè ñêîðîñòè ïðîáåãà ïî èãðîâîìó ïîëþ
+//константный массив неактивных ячеек - для оптимизации скорости пробега по игровому полю
 constexpr std::pair<int, int> NonActiveCells[] = {
 	{0,1},{0,3},{0,5},{0,7},{1,0},{1,2},{1,4},{1,6},
 	{2,1},{2,3},{2,5},{2,7},{3,0},{3,2},{3,4},{3,6},
@@ -41,7 +41,7 @@ constexpr std::pair<int, int> NonActiveCells[] = {
 	{6,1},{6,3},{6,5},{6,7},{7,0},{7,2},{7,4},{7,6}
 };
 
-//êîíñòàíòíûé ìàññèâ àêòèâíûõ ÿ÷ååê - äëÿ îïòèìèçàöèè ñêîðîñòè ïðîáåãà ïî èãðîâîìó ïîëþ
+//константный массив активных ячеек - для оптимизации скорости пробега по игровому полю
 constexpr std::pair<int, int> ActiveCells[] = {
 	{1,1},{1,3},{1,5},{1,7},{0,0},{0,2},{0,4},{0,6},
 	{3,1},{3,3},{3,5},{3,7},{2,0},{2,2},{2,4},{2,6},
@@ -50,23 +50,23 @@ constexpr std::pair<int, int> ActiveCells[] = {
 };
 
 
-//êîíñòðóêòîð áîò
+//конструктор бота
 BotV3::BotV3(int b_or_w, Playboard* instance) : Player(instance) {
 
-	//ïðèñâàèâàåì öâåò øàøåê
+	//присваиваем цвет шашек
 	color = static_cast<Positions>(b_or_w);
 
-	//èíèöèàëèçèðóåì èãðîâîå ïîëå âíóòðè áîòà - èíèöèàëèçèðóåì íåàêòèâíûå ÿ÷åéêè
+	//инициализируем игровое поле внутри бота - инициализируем неактивные ячейки
 	for (auto& nonactcell : NonActiveCells) {
 		PosBoard[nonactcell.first][nonactcell.second] = static_cast<int>(Positions::CELL_UNPLBL);
 	}
 
-	//èíèöèàëèçèðóåì àêòèâíûå ÿ÷åéêè
+	//инициализируем активные ячейки
 	for (auto& actcell : ActiveCells) {
 		PosBoard[actcell.first][actcell.second] = static_cast<int>(Positions::CELL_PLBL);
 	}
 
-	//îïðåäåëÿåì öâåò øàøåê ñîïåðíèêà áîòà
+	//определяем цвет шашек соперника бота
 	if (color == Positions::WHITE_CHECKER) {
 		enemycolor = Positions::BLACK_CHECKER;
 	}
@@ -75,20 +75,20 @@ BotV3::BotV3(int b_or_w, Playboard* instance) : Player(instance) {
 }
 
 
-//ñêàíåð èãðîâîãî ïîëÿ
+//сканер игрового поля
 void BotV3::BoardScanner() {
 
-	//ïðîõîäèì òîëüêî ïî àêòèâíûì ÿ÷åéêàì
+	//проходим только по активным ячейкам
 	for (auto& actcell : ActiveCells) {
 
-		//îïðåäåëÿåì öâåò íà äàííîé ÿ÷åéêå
+		//определяем цвет на данной ячейке
 		CheckerColor check = gameCheckers->getCell(actcell.first, actcell.second)->getCheckerColor();
 
-		//îïðåäåëÿåì øàøêà ýòî èëè êîðîëü, åñëè ÷òî-òî ñòîèò
+		//определяем шашка это или король, если что-то стоит
 		CheckerHierarchy check_post = gameCheckers->getCell(actcell.first, actcell.second)->getCheckerPost();
 
-		//åñëè íè÷åãî íå ñòîèò,
-		//òî ýòî ïðîñòî àêòèâíàÿ ÿ÷åéêà
+		//если ничего не стоит,
+		//то это просто активная ячейка
 		if (check == EXCEPTION_COLOR) {
 			PosBoard[actcell.first][actcell.second] = static_cast<int>(Positions::CELL_PLBL);
 		}
@@ -109,60 +109,60 @@ void BotV3::BoardScanner() {
 	}
 }
 
-//ôóíêöèÿ õîäà áîòà
+//функция хода бота
 bool BotV3::Turn(int x, int y, CheckerColor b_or_w) {
 
-	//íà íà÷àëî õîäà âûïîëíèë ñêàíèðîâàíèå èãðîâîãî ïîëÿ
+	//на начало хода выполнил сканирование игрового поля
 	BoardScanner();
 
-	//ïîëó÷èì ñàìûé "ðåéòèíãîâûé" õîä
+	//получим самый "рейтинговый" ход
 	PosTurn turn = ReturnMove();
 
 
-	//âûäåëèì ÿ÷åéêó èç êîòîðîé ïðîèçâåäåí õîä
+	//выделим ячейку из которой произведен ход
 	gameCheckers->Select(turn.from.first, turn.from.second, b_or_w);
-	//ñõîäèì íà ÿ÷åéêó êóäà áûë ïðîèçâåäåí õîä
+	//сходим на ячейку куда был произведен ход
 	gameCheckers->Select(turn.to.first, turn.to.second, b_or_w);
 
-	//åñëè åñòü ìíîæåñòâåííîå ñúåäåíèå, ïðîõîäèìñÿ ïî âåêòîðó ìíîæåñòâåííûõ ñúåäåíèé
-	//ïðîæèìàÿ ìåñòà ñúåäåíèé
+	//если есть множественное съедение, проходимся по вектору множественных съедений
+	//прожимая места съедений
 	if (!turn.another_eats.empty()) {
 		for (auto& eats : turn.another_eats) {
 			gameCheckers->Select(eats.first, eats.second, b_or_w);
 		}
 	}
 
-	//îáíóëÿåì âåêòîðà õîäîâ
+	//обнуляем вектора ходов
 	RefreshVectors();
 	
-	//õîä âûïîëíåí
+	//ход выполнен
 	return true;
 }
 
-//îáíîâëåíèå âåêòîðîâ õîäîâ
+//обновление векторов ходов
 void BotV3::RefreshVectors() {
 	PosMoves.clear();
 	PosMovesEnemy.clear();
-	//ïåðåíîñèì â íà÷àëüíîå ñîñòîÿíèå ôëàã ñúåäåíèÿ âðàãîì
+	//переносим в начальное состояние флаг съедения врагом
 	canEnemyEat = false;
 }
 
 
-//ïðîâåðêà ãðàíèö õîäà
+//проверка границ хода
 inline bool BotV3::CheckBorders(int x, int y, int dx, int dy) {
 	return x + dx >= 0 && x + dx < 8 && y + dy >= 0 && y + dy < 8;
 }
 
-//ïðîâåðêà õîäà íà ñòàíîâëåíèå äàìêîé
+//проверка хода на становление дамкой
 inline bool BotV3::CheckBecomeKing(int y, Positions Col) {
 	if (Col == Positions::WHITE_CHECKER) {
-		//äëÿ áåëûõ - åñëè äîñòèãíóòà âåðõíÿÿ ãðàíèöà ïîëÿ
+		//для белых - если достигнута верхняя граница поля
 		if (y == 7) {
 			return true;
 		}
 	}
 	else if (Col == Positions::BLACK_CHECKER) {
-		//äëÿ ÷åðíûõ - åñëè äîñòèãíóòà íèæíÿÿ ãðàíèöà ïîëÿ
+		//для черных - если достигнута нижняя граница поля
 		if (y == 0) {
 			return true;
 		}
@@ -171,50 +171,50 @@ inline bool BotV3::CheckBecomeKing(int y, Positions Col) {
 }
 
 
-/*ôóíêöèÿ íàõîæäåíèÿ âîçìîæíûõ ñúåäåíèé îáû÷íîé øàøêîé â îäíó ñòîðîíó, ñòîðîíà îïðåäåëÿåòñÿ ïåðåìåííûìè dx dy
-* Board - ïîëå íà êîòîðîì ïðîèñõîäèò íàõàæîäåíèå õîäà
-* x, y - îòêóäà
-* dx dy - ïðèðàùåíèå êîîðäèíàòû
-* Col - öâåò áîòà
-* enemyCol - öâåò ñîïåðíèêà
-* movesVec - âåêòîð âîçìîæíûõ õîäîâ
+/*функция нахождения возможных съедений обычной шашкой в одну сторону, сторона определяется переменными dx dy
+* Board - поле на котором происходит нахажодение хода
+* x, y - откуда
+* dx dy - приращение координаты
+* Col - цвет бота
+* enemyCol - цвет соперника
+* movesVec - вектор возможных ходов
 */
 void BotV3::CheckEats(std::array<std::array<int, 8>, 8>& Board, int x, int y, int dx, int dy,
 	Positions Col, Positions enemyCol, std::vector<PosTurn>& movesVec) {
 
-	//ïðîâåðèì ãðàíèöû
+	//проверим границы
 	if (CheckBorders(x, y, dx, dy)) {
 
-		//ïðîâåðèì ñîñåäíþþ ÿ÷åéêó â ñîîòâåòñòâèè ñ âåêòîðîì ïðèðàùåíèÿ íà íàëè÷èå øàøêè ñîïåðíèêà
+		//проверим соседнюю ячейку в соответствии с вектором приращения на наличие шашки соперника
 		if (Board[x + dx][y + dy] == static_cast<int>(enemyCol) || Board[x + dx][y + dy] == static_cast<int>(enemyCol) + 2) {
 
-			//ïðîâåðèì ÿ÷åéêó, íà êîòîðóþ áóäåì ïåðåìåùàòüñÿ â ñëó÷àå ñúåäåíèÿ, íàõîäèòñÿ ëè îíà â ãðàíèöàõ ïîëÿ è ïóñòàÿ ëè îíà
+			//проверим ячейку, на которую будем перемещаться в случае съедения, находится ли она в границах поля и пустая ли она
 			if (CheckBorders(x, y, 2 * dx, 2 * dy) && Board[x + 2 * dx][y + 2 * dy] == static_cast<int>(Positions::CELL_PLBL)) {
 
-				//åñëè âñå óñëîâèÿ âûïîëíåíû
+				//если все условия выполнены
 				// 
-				//ñîçäàåì êîîðäèíàòû
-				//xy - îòêóäà ïåðåìåùàåìñÿ
-				//eatedxy - ÷òî ñúåëè
-				//dxdy - êóäà ïåðåìåñòèëèñü
+				//создаем координаты
+				//xy - откуда перемещаемся
+				//eatedxy - что съели
+				//dxdy - куда переместились
 				auto xy = std::make_pair(x, y);
 				auto eatedxy = std::make_pair(x + dx, y + dy);
 				auto dxdy = std::make_pair(x + 2 * dx, y + 2 * dy);
 
-				//çàïîëíÿåì âåêòîð õîäîâ è çàïîëíÿåì âåêòîð ñúåäåííûõ øàøåê çà ýòîò õîä
+				//заполняем вектор ходов и заполняем вектор съеденных шашек за этот ход
 				movesVec.push_back({ xy, dxdy });
 				movesVec[movesVec.size() - 1].whoWasEated.push_back(eatedxy);
 
 
-				//ïîâûøàåì ðåéòèíã õîäà
-				//ïîâûøàåì íà ðåéòèíã ñúåäåíèÿ
+				//повышаем рейтинг хода
+				//повышаем на рейтинг съедения
 				movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::CAN_GO) + static_cast<int>(SituationCost::EAT);
 
-				//åñëè ñúåëè äàìêó, òî ïîâûøàåì íà öåííîñòü ñúåäåíèÿ äàìêè
+				//если съели дамку, то повышаем на ценность съедения дамки
 				if (Board[x + dx][y + dy] == static_cast<int>(enemyCol) + 2) {
 					movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::EAT_KING);
 				}
-				//åñëè øàøêà ñòàíåò äàìêîé â ñëó÷àå ýòîãî õîäà, òî ïîâûøàåì ðåéòèíã íà âåëè÷èíó ñòàíîâëåíèÿ äàìêîé
+				//если шашка станет дамкой в случае этого хода, то повышаем рейтинг на величину становления дамкой
 				if (CheckBecomeKing(dxdy.second, Col)) {
 					movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::BECOME_KING);
 				}
@@ -224,87 +224,87 @@ void BotV3::CheckEats(std::array<std::array<int, 8>, 8>& Board, int x, int y, in
 }
 
 
-/*ôóíêöèÿ íàõîæäåíèÿ âîçìîæíûõ ñúåäåíèé äàìêîé â îäíó ñòîðîíó, ñòîðîíà îïðåäåëÿåòñÿ ïåðåìåííûìè dx dy
-* Board - ïîëå íà êîòîðîì ïðîèñõîäèò íàõàæîäåíèå õîäà
-* x, y - îòêóäà
-* dx dy - ïðèðàùåíèå êîîðäèíàòû
-* Col - öâåò áîòà
-* enemyCol - öâåò ñîïåðíèêà
-* movesVec - âåêòîð âîçìîæíûõ õîäîâ
+/*функция нахождения возможных съедений дамкой в одну сторону, сторона определяется переменными dx dy
+* Board - поле на котором происходит нахажодение хода
+* x, y - откуда
+* dx dy - приращение координаты
+* Col - цвет бота
+* enemyCol - цвет соперника
+* movesVec - вектор возможных ходов
 */
 void BotV3::CheckEatsForKing(std::array<std::array<int, 8>, 8>& Board, int x, int y, int dx, int dy,
 	Positions Col, Positions enemyCol, std::vector<PosTurn>& movesVec) {
 
-	//îïðåäåëÿåì çíàê ïðèðàùåíèÿ
+	//определяем знак приращения
 	int ddx = sign(dx);
 	int ddy = sign(dy);
 
-	//ïðîâåðÿåì õîäû, ïîêà íàõîäèìñÿ â ãðàíèöàõ
+	//проверяем ходы, пока находимся в границах
 	while (CheckBorders(x, y, dx, dy)) {
 
-		//ïðîâåðèì ñîñåäíþþ ÿ÷åéêó â ñîîòâåòñòâèè ñ âåêòîðîì ïðèðàùåíèÿ íà íàëè÷èå øàøêè ñîïåðíèêà
+		//проверим соседнюю ячейку в соответствии с вектором приращения на наличие шашки соперника
 		if (Board[x + dx][y + dy] == static_cast<int>(enemyCol) || Board[x + dx][y + dy] == static_cast<int>(enemyCol) + 2) {
 
-			//ïðîâåðèì ÿ÷åéêó, íà êîòîðóþ áóäåì ïåðåìåùàòüñÿ â ñëó÷àå ñúåäåíèÿ, íàõîäèòñÿ ëè îíà â ãðàíèöàõ ïîëÿ è ïóñòàÿ ëè îíà
+			//проверим ячейку, на которую будем перемещаться в случае съедения, находится ли она в границах поля и пустая ли она
 			if (CheckBorders(x, y, dx + ddx, dy + ddy) && Board[x + dx + ddx][y + dy + ddy] == static_cast<int>(Positions::CELL_PLBL)) {
 				
-				//åñëè ìîæåì ñúåñòü øàøêó, òî äîáàâëÿåì å¸ êîîðäèíàòû â âåêòîð ñúåäàåìûõ øàøåê
+				//если можем съесть шашку, то добавляем её координаты в вектор съедаемых шашек
 				auto eatedxy = std::make_pair(x + dx, y + dy);
 
-				//ïåðåõîäèì íà äàííóþ êëåòêó
+				//переходим на данную клетку
 				dx += ddx;
 				dy += ddy;
 
-				//òåïåðü äîáàâèì âñå âîçìîæíûå õîäû â îäíó ñòîðîíó äëÿ äàìêè ïîñëå ñúåäåíèÿ
+				//теперь добавим все возможные ходы в одну сторону для дамки после съедения
 				while (CheckBorders(x, y, dx, dy) && Board[x + dx][y + dy] == static_cast<int>(Positions::CELL_PLBL)) {
 
-				    //åñëè âñå óñëîâèÿ âûïîëíåíû
+				    //если все условия выполнены
 				    // 
-				    //ñîçäàåì êîîðäèíàòû
-				    //xy - îòêóäà ïåðåìåùàåìñÿ
-				    //dxdy - êóäà ïåðåìåñòèëèñü
+				    //создаем координаты
+				    //xy - откуда перемещаемся
+				    //dxdy - куда переместились
 					auto xy = std::make_pair(x, y);
 					auto dxdy = std::make_pair(x + dx, y + dy);
 					movesVec.push_back({ xy, dxdy });
 					movesVec[movesVec.size() - 1].whoWasEated.push_back(eatedxy);
 
-					//åñëè ìîæåì ñúåñòü ïîâûøàåì ðåéòèíã
+					//если можем съесть повышаем рейтинг
 					movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::CAN_GO) + static_cast<int>(SituationCost::EAT);
-					//åñëè ñúåäàåì äàìêó òî åù¸ ïîâûøàåì ðåéòèíã õîäà
+					//если съедаем дамку то ещё повышаем рейтинг хода
 					if (Board[x + dx][y + dy] == static_cast<int>(enemyCol) + 2) {
 						movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::EAT_KING);
 					}
-					//ïåðåäâèãàåìñÿ äàëüøå
+					//передвигаемся дальше
 					dx += ddx;
 					dy += ddy;
 				}
-				//return â ñëó÷àå, åñëè ìû íà÷àëè âûõîäèòü çà ãðàíèöû èëè ÿ÷åéêà çàíÿòà
+				//return в случае, если мы начали выходить за границы или ячейка занята
 				return;
 			}
 			else
 				return;
 		}
-		//ïåðåäâèãàåìñÿ äàëüøå ïîêà íå âñòðåòèì øàøêó ñîïåðíèêà
+		//передвигаемся дальше пока не встретим шашку соперника
 		dx += ddx;
 		dy += ddy;
 	}
 
 }
 
-//íàéäåì âñå âîçìîæíûå ñúåäåíèÿ äëÿ âñåõ øàøåê
+//найдем все возможные съедения для всех шашек
 void BotV3::FindEats(std::array<std::array<int, 8>, 8>& Board, Positions Col, Positions enemyCol, std::vector<PosTurn>& movesVec) {
-	//ïðîõîäèìñÿ ïî âñåì ÿ÷åéêàì(íå îïòèìèçèðîâàíî)
+	//проходимся по всем ячейкам(не оптимизировано)
 	for (int y = 0; y < 8; y++) {
 		for (int x = 0; x < 8; x++) {
 
-			//åñëè öâåò ÿ÷åéêè ñîâïàäàåò ñ çàäàííûì, òî ïðîâåðÿåì íà ñúåäåíèå âî âñå 4 ñòîðîíû
+			//если цвет ячейки совпадает с заданным, то проверяем на съедение во все 4 стороны
 			if (Board[x][y] == static_cast<int>(Col)) {
 				CheckEats(Board, x, y, 1, 1, Col, enemyCol, movesVec);
 				CheckEats(Board, x, y, -1, 1, Col, enemyCol, movesVec);
 				CheckEats(Board, x, y, 1, -1, Col, enemyCol, movesVec);
 				CheckEats(Board, x, y, -1, -1, Col, enemyCol, movesVec);
 			}
-			//åñëè öâåò ÿ÷åéêè ñîâïàäàåò ñ íàøèì, íî ÿâëÿåòñÿ äàìêîé, òî ïðîâåðÿåì íà ñúåäåíèå äàìêîé âî âñå 4 ñòîðîíû
+			//если цвет ячейки совпадает с нашим, но является дамкой, то проверяем на съедение дамкой во все 4 стороны
 			if (Board[x][y] == static_cast<int>(Col) + 2) {
 				CheckEatsForKing(Board, x, y, 1, 1, Col, enemyCol, movesVec);
 				CheckEatsForKing(Board, x, y, -1, 1, Col, enemyCol, movesVec);
@@ -316,46 +316,46 @@ void BotV3::FindEats(std::array<std::array<int, 8>, 8>& Board, Positions Col, Po
 }
 
 
-/*ôóíêöèÿ íàõîæäåíèÿ âîçìîæíûõ õîäîâ îáû÷íîé øàøêîé âî âñå ñòîðîíû, ñòîðîíû îïðåäåëÿþòñÿ öâåòîì øàøêè
-* Board - ïîëå íà êîòîðîì ïðîèñõîäèò íàõàæîäåíèå õîäà
-* x, y - îòêóäà
-* Col - öâåò áîòà
-* movesVec - âåêòîð âîçìîæíûõ õîäîâ
+/*функция нахождения возможных ходов обычной шашкой во все стороны, стороны определяются цветом шашки
+* Board - поле на котором происходит нахажодение хода
+* x, y - откуда
+* Col - цвет бота
+* movesVec - вектор возможных ходов
 */
 void BotV3::CheckMoves(std::array<std::array<int, 8>, 8>& Board, int x, int y, Positions Col, std::vector<PosTurn>& movesVec) {
-	//ïåðåìåííûå ïåðåìåùåíèÿ
+	//переменные перемещения
 	int dx = 1, dy;
 
-	//åñëè áåëûå - èäåì ââåðõ, ñ ÷åðíûìè èíà÷å
+	//если белые - идем вверх, с черными иначе
 	if (Col == Positions::WHITE_CHECKER) {
 		dy = 1;
 	}
 	else
 		dy = -1;
 
-	//ñíà÷àëà âïðàâî
-	//ïðîâåðÿåì ãðàíèöû
+	//сначала вправо
+	//проверяем границы
 	if (CheckBorders(x, y, dx, dy)) {
 		
-		//åñëè ÿ÷åéêà ïóñòàÿ, ìîæåì ñõîäèòü íà íå¸
+		//если ячейка пустая, можем сходить на неё
 		if (Board[x + dx][y + dy] == static_cast<int>(Positions::CELL_PLBL)) {
 
-			//ñîçäàåì êîîðäèíàòû õîäà, ïåðâîå - îòêóäà, âòîðîå - êóäà
+			//создаем координаты хода, первое - откуда, второе - куда
 			auto xy = std::make_pair(x, y);
 			auto dxdy = std::make_pair(x + dx, y + dy);
 			movesVec.push_back({ xy, dxdy });
 
-			//åñëè ìîæåì ñõîäèòü òî äîáàâëÿåì ñîîòâåòñòâóþùåå çíà÷åíèå
+			//если можем сходить то добавляем соответствующее значение
 			movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::CAN_GO);
 
-			//åñëè ñòàíîâèìñÿ äàìêîé, òî äîáàâëÿåì ñîîòâåòñòâóþùèé ðåéòèíã
+			//если становимся дамкой, то добавляем соответствующий рейтинг
 			if (CheckBecomeKing(dxdy.second, Col)) {
 				movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::BECOME_KING);
 			}
 		}
 	}
 
-	//òåïåðü òî æå ñàìîå òîëüêî âëåâî
+	//теперь то же самое только влево
 	dx = -1;
 
 	if (CheckBorders(x, y, dx, dy)) {
@@ -372,48 +372,48 @@ void BotV3::CheckMoves(std::array<std::array<int, 8>, 8>& Board, int x, int y, P
 }
 
 
-/*ôóíêöèÿ íàõîæäåíèÿ âîçìîæíûõ õîäîâ äàìêîé â îäíó ñòîðîíó, ñòîðîíà îïðåäåëÿåòñÿ ïåðåìåííûìè dx dy
-* Board - ïîëå íà êîòîðîì ïðîèñõîäèò íàõàæîäåíèå õîäà
-* x, y - îòêóäà
-* dx dy - ïðèðàùåíèå êîîðäèíàòû
-* movesVec - âåêòîð âîçìîæíûõ õîäîâ
+/*функция нахождения возможных ходов дамкой в одну сторону, сторона определяется переменными dx dy
+* Board - поле на котором происходит нахажодение хода
+* x, y - откуда
+* dx dy - приращение координаты
+* movesVec - вектор возможных ходов
 */
 void BotV3::CheckMovesForKing(std::array<std::array<int, 8>, 8>& Board, int x, int y, int dx, int dy, std::vector<PosTurn>& movesVec) {
-	//îïðåäåëÿåì çíàê ïðèðàùåíèÿ
+	//определяем знак приращения
 	int ddx = sign(dx);
 	int ddy = sign(dy);
 
-	//ïðîâåðÿåì ãðàíèöû è îòñóòñòâèå øàøåê íà êëåòêå
-	while (CheckBorders(x, y, dx, dy) && PosBoard[x + dx][y + dy] == static_cast<int>(Positions::CELL_PLBL)) { //è ïîêà íåò øàøåê íà êëåòêå
+	//проверяем границы и отсутствие шашек на клетке
+	while (CheckBorders(x, y, dx, dy) && PosBoard[x + dx][y + dy] == static_cast<int>(Positions::CELL_PLBL)) { //и пока нет шашек на клетке
 
-		//äîáàâèì êîîðäèíàòû îòêóäà-êóäà â âåêòîð õîäà
+		//добавим координаты откуда-куда в вектор хода
 		auto xy = std::make_pair(x, y);
 		auto dxdy = std::make_pair(x + dx, y + dy);
 		movesVec.push_back({ xy, dxdy });
 		movesVec[movesVec.size() - 1].relevance += static_cast<int>(SituationCost::CAN_GO);
 		dx += ddx;
-		dy += ddy; //ïåðåäâèãàåìñÿ âïåðåä
+		dy += ddy; //передвигаемся вперед
 	}
 }
 
 
-/*ôóíêöèÿ íàõîæäåíèÿ âñåõ âîçìîæíûõ õîäîâ
-* Board - ïîëå íà êîòîðîì ïðîèñõîäèò íàõàæîäåíèå õîäà
-* Col - öâåò áîòà
-* movesVec - âåêòîð âîçìîæíûõ õîäîâ
+/*функция нахождения всех возможных ходов
+* Board - поле на котором происходит нахажодение хода
+* Col - цвет бота
+* movesVec - вектор возможных ходов
 */
 void BotV3::FindMoves(std::array<std::array<int, 8>, 8>& Board, Positions Col, std::vector<PosTurn>& movesVec) {
 
-	//ïðîõîäèìñÿ ïî âñåìó ïîëþ
+	//проходимся по всему полю
 	for (int y = 0; y < 8; y++) {
 		for (int x = 0; x < 8; x++) {
-			//åñëè îáû÷íàÿ øàøêà
+			//если обычная шашка
 			if (Board[x][y] == static_cast<int>(Col)) {
 				CheckMoves(Board, x, y, Col, movesVec);
 			}
-			//åñëè äàìêà
+			//если дамка
 			else if (Board[x][y] == static_cast<int>(Col) + 2) {
-				//ïðîõîäèì âî âñå ñòîðîíû
+				//проходим во все стороны
 				CheckMovesForKing(Board, x, y, 1, 1, movesVec);
 				CheckMovesForKing(Board, x, y, -1, 1, movesVec);
 				CheckMovesForKing(Board, x, y, 1, -1, movesVec);
@@ -424,15 +424,15 @@ void BotV3::FindMoves(std::array<std::array<int, 8>, 8>& Board, Positions Col, s
 }
 
 
-//ïðîâåðêà âåêòîðà ñúåäåííûõ øàøåê, áûëà ëè ñúåäåíà øàøêà ïî äàííîé êîîðäèíàòå
+//проверка вектора съеденных шашек, была ли съедена шашка по данной координате
 bool BotV3::IsWasChecked(int x, int y, std::vector<std::pair<int, int>>& enemyPos) {
 	for (auto& enemy : enemyPos) {
-		//åñëè êîîðäèíàòû øàøêè è çàäàííûõ êîîðäèíàò ñîâïàäàþò òî áûëà ñúåäåíà
+		//если координаты шашки и заданных координат совпадают то была съедена
 		if (enemy.first == x && enemy.second == y) {
 			return true;
 		}
 	}
-	//èíà÷å íåò
+	//иначе нет
 	return false;
 }
 
@@ -450,51 +450,51 @@ bool BotV3::IsWasCheckedByFather(int x, int y, ternaryTree* wayTree) {
 }
 
 
-/*ôóíêöèÿ ïðîâåðêè âîçìîæíûõ ñúåäåíèé ïîñëå òîãî êàê ñúåëè øàøêó
-* Board - èãðîâîå ïîëå
-* wayTree - òðîè÷íîå äåðåâî îïòèìàëüíîãî ïóòè
-* enemyCol - öâåò ñîïåðíèêà
-* stop - êîîðäèíàòà îñòàíîâêè, ÷òîáû íå õîäèòü ïî êðóãó
-* enemyPos - âåêòîð ñúåäåííûõ øàøåê
+/*функция проверки возможных съедений после того как съели шашку
+* Board - игровое поле
+* wayTree - троичное дерево оптимального пути
+* enemyCol - цвет соперника
+* stop - координата остановки, чтобы не ходить по кругу
+* enemyPos - вектор съеденных шашек
 */
 void BotV3::CheckContinue
 (std::array<std::array<int, 8>, 8>& Board, ternaryTree* wayTree, Positions enemyCol,
 	std::pair<int, int> stop, std::vector<std::pair<int, int>>& enemyPos) {
 
-	//ñîçäàäèì ïåðåìåííûå äëÿ óäîáñòâà
+	//создадим переменные для удобства
 	int dx = wayTree->getDX();
 	int dy = wayTree->getDY();
 	int x = wayTree->getXto();
 	int y = wayTree->getYto();
 
-	//ïðîâåðêà ãðàíèö
+	//проверка границ
 	if (CheckBorders(x, y, dx, dy)) {
 
-		//ïðîâåðèì ñîñåäíþþ ÿ÷åéêó â ñîîòâåòñòâèè ñ âåêòîðîì ïðèðàùåíèÿ íà íàëè÷èå øàøêè ñîïåðíèêà
+		//проверим соседнюю ячейку в соответствии с вектором приращения на наличие шашки соперника
 		if ((Board[x + dx][y + dy] == static_cast<int>(enemyCol) || Board[x + dx][y + dy] == static_cast<int>(enemyCol) + 2)
 
-			//ïðîâåðèì áûëà ëè ñúåäåíà äàííàÿ øàøêà è íå ÿâëÿåòñÿ ëè äàííàÿ êîîðäèíàòà êîîðäèíàòîé îñòàíîâêè
+			//проверим была ли съедена данная шашка и не является ли данная координата координатой остановки
 			&& !IsWasChecked(x + dx, y + dy, enemyPos) && (x + dx != stop.first && y + dy != stop.second)) {
 
-			//ïðîâåðÿåì ãðàíèöû ÿ÷åéêè, êóäà áóäåì ïåðåìåùàòüñÿ ïîñëå ñúåäåíèÿ
+			//проверяем границы ячейки, куда будем перемещаться после съедения
 			if (CheckBorders(x, y, 2 * dx, 2 * dy) && Board[x + 2 * dx][y + 2 * dy] == static_cast<int>(Positions::CELL_PLBL)) {
 
 
-				//äîáàâèì êîîðäèíàòû îòêóäà-êóäà â äåðåâî ïóòè
+				//добавим координаты откуда-куда в дерево пути
 				auto xy = std::make_pair(x, y);
 				auto dxdy = std::make_pair(x + 2 * dx, y + 2 * dy);
 
-				//ïîâûñèì âûñîòó äåðåâà
+				//повысим высоту дерева
 				wayTree->incrementHeight();
 				wayTree->first = new ternaryTree(xy, dxdy, wayTree);
 
-				//ïðîâåðèì âîçìîæíîñòü äàëüíåéøåãî ñúåäåíèÿ äëÿ ýòîé âåòêè ïóòè
+				//проверим возможность дальнейшего съедения для этой ветки пути
 				CheckContinue(Board, wayTree->first, enemyCol, stop, enemyPos);
 
 			}
 		}
 	}
-	//òî æå ñàìîå ÷òî è ñâåðõó òîëüêî äëÿ äðóãîãî íàïðàâëåíèÿ
+	//то же самое что и сверху только для другого направления
 	if (CheckBorders(x, y, dx, -dy)) {
 
 		if ((Board[x + dx][y - dy] == static_cast<int>(enemyCol) || Board[x + dx][y - dy] == static_cast<int>(enemyCol) + 2)
@@ -502,10 +502,10 @@ void BotV3::CheckContinue
 
 			if (CheckBorders(x, y, 2 * dx, -2 * dy) && Board[x + 2 * dx][y - 2 * dy] == static_cast<int>(Positions::CELL_PLBL)
 				&& !(x + 2 * dx == stop.first && y - 2 * dy == stop.second) &&
-				//äîáàâëÿåòñÿ åù¸ îäíà ïðîâåðêà, áûë ëè ïðîâåðåí äàííûé õîä ïðåäêàìè
-				//ñîçäàíî äëÿ òîãî, ÷òîáû íå õîäèòü ïî êðóãó
-				//â ïåðâîì ñëó÷àå ýòîãî íå ïðîèñõîäèò, òàê êàê â ñëó÷àå ìíîãîêðàòíîãî ñúåäåíèÿ,
-				//ïåðåäâèæåíèå â îäíîì íàïðàâëåíèè íå äàñò çàöèêëèâàíèÿ
+				//добавляется ещё одна проверка, был ли проверен данный ход предками
+				//создано для того, чтобы не ходить по кругу
+				//в первом случае этого не происходит, так как в случае многократного съедения,
+				//передвижение в одном направлении не даст зацикливания
 				IsWasCheckedByFather(x + 2 * dx, y - 2 * dy, wayTree)) {
 
 				auto xy = std::make_pair(x, y);
@@ -520,7 +520,7 @@ void BotV3::CheckContinue
 			}
 		}
 	}
-	//òî æå ñàìîå
+	//то же самое
 	if (CheckBorders(x, y, -dx, dy)) {
 
 		if ((Board[x - dx][y + dy] == static_cast<int>(enemyCol) || Board[x - dx][y + dy] == static_cast<int>(enemyCol) + 2)
@@ -547,9 +547,9 @@ void BotV3::CheckContinue
 
 
 
-//íàõîäèì îïòèìàëüíûé õîä, â ñëó÷àå íàëè÷èÿ ìíîæåñòâåííûõ õîäîâ è ðàçâèëîê
-//ïîäáèðàåòñÿ ñíà÷àëà èñêëþ÷åíèåì
-//ïîòîì ó êîãî âûñîòà áîëüøå
+//находим оптимальный ход, в случае наличия множественных ходов и развилок
+//подбирается сначала исключением
+//потом у кого высота больше
 void BotV3::FillAnotherEats(ternaryTree* wayTree, PosTurn& pos) {
 	if (wayTree->first == nullptr && wayTree->second == nullptr && wayTree->third == nullptr) {
 		return;
@@ -622,7 +622,7 @@ void BotV3::FillAnotherEats(ternaryTree* wayTree, PosTurn& pos) {
 }
 
 
-//ôóíêöèÿ âîçâðàùàþùàÿ èíäåêñ íàïðàâëåíèÿ, ïî êîòîðîìó áóäåò ïðîëîæåí ïóòü
+//функция возвращающая индекс направления, по которому будет проложен путь
 inline Ways getWay(int dx, int dy) {
 	if (dx == 1 && dy == 1) {
 		return FIRST;
@@ -640,22 +640,22 @@ inline Ways getWay(int dx, int dy) {
 }
 
 
-//ôóíêöèÿ íàõîæäåíèÿ äîïîëíèòåëüíûõ ñúåäåíèé äàìêîé
+//функция нахождения дополнительных съедений дамкой
 void BotV3::FindWay(int x, int y, int dx, int dy, std::array<std::array<int, 8>, 8> Board, quadrupleTree* wayTree, Positions enemyCol) {
 
-	//ïî âåêòîðó íàïðàâëåíèÿ âûáèðàåì ïóòü
+	//по вектору направления выбираем путь
 	auto destiny = getWay(dx, dy);
 
-	//ïðîâåðÿåì ãðàíèöû ïîëÿ
+	//проверяем границы поля
 	while (CheckBorders(x, y, dx, dy)) {
 
-		//ïðîâåðÿåì ñíà÷àëà íà òî, åñòü ëè øàøêà íà ïóòè
+		//проверяем сначала на то, есть ли шашка на пути
 		if (Board[x + dx][y + dy] == static_cast<int>(enemyCol) || Board[x + dx][y + dy] == static_cast<int>(enemyCol) + 2)
 		{
-			//åñëè åñòü òî ïðîâåðÿåì ñâîáîäíî ëè çà íåé
+			//если есть то проверяем свободно ли за ней
 			if (CheckBorders(x, y, 2 * dx, 2 * dy) && Board[x + 2 * dx][y + 2 * dy] == static_cast<int>(Positions::CELL_PLBL)) {
 
-				//ìåíÿåì ìåñòàìè øàøêó 
+				//меняем местами шашку 
 				std::swap(Board[x][y], Board[x + 2 * dx][y + 2 * dy]);
 
 				auto xy = std::make_pair(x, y);
@@ -664,24 +664,24 @@ void BotV3::FindWay(int x, int y, int dx, int dy, std::array<std::array<int, 8>,
 				Board[x + dx][y + dy] = static_cast<int>(Positions::CELL_PLBL);
 
 
-				//çàïîëíÿåì äåðåâî ïóòè íîâûì õîäîì
+				//заполняем дерево пути новым ходом
 				wayTree->incrementHeight();
 				wayTree->way[destiny] = new quadrupleTree(xy, dxdy, wayTree);
 				wayTree->way[destiny]->eated = std::make_pair(x + dx, y + dy);
 
-				//ðåêóðñèÿ
+				//рекурсия
 				CheckContinueForKing(Board, wayTree->way[destiny], enemyCol);
 
 			}
 		}
-		//åñëè íåò, òî èäåì äàëüøå â ïîèñêå øàøêè
+		//если нет, то идем дальше в поиске шашки
 		x += dx;
 		y += dy;
 	}
 }
 
 
-//ôóíêöèÿ, íàõîäÿùàÿ âîçìîæíûå äîïîëíèòåëüíûå ñúåäåíèÿ äëÿ äàìêè âî âñå 4 ñòîðîíû
+//функция, находящая возможные дополнительные съедения для дамки во все 4 стороны
 void BotV3::CheckContinueForKing
 (std::array<std::array<int, 8>, 8> Board, quadrupleTree* wayTree, Positions enemyCol) {
 	int dx = sign(wayTree->getDX());
@@ -696,11 +696,11 @@ void BotV3::CheckContinueForKing
 }
 
 
-//ôóíêöèÿ, âûáèðàþùàÿ îïòèìàëüíûé ïóòü ñúåäåíèÿ øàøåê, äëÿ òîãî ÷òîáû ñúåñòü ïî ìàêñèìóìó
+//функция, выбирающая оптимальный путь съедения шашек, для того чтобы съесть по максимуму
 void BotV3::FillAnotherEatsForKing(quadrupleTree* wayTree, PosTurn& pos) {
 	int height = -1;
 
-	//ñíà÷àëà íàõîäèì ìàêñèìàëüíóþ âûñîòó äåðåâà
+	//сначала находим максимальную высоту дерева
 	for (int i = 0; i < 4; i++) {
 		if (wayTree->way[i] != nullptr && wayTree->way[i]->height > height) {
 
@@ -709,7 +709,7 @@ void BotV3::FillAnotherEatsForKing(quadrupleTree* wayTree, PosTurn& pos) {
 		}
 	}
 
-	//çàòåì äëÿ ìàêñèìàëüíîé âûñîòû çàïèõèâàåì â âåêòîð äîï õîäîâ íàø íîâûé äîïîëíèòåëüíûé õîä ñúåäåíèÿ
+	//затем для максимальной высоты запихиваем в вектор доп ходов наш новый дополнительный ход съедения
 	for (int i = 0; i < 4; i++) {
 		if (wayTree->way[i] != nullptr && wayTree->way[i]->height == height) {
 
@@ -720,35 +720,35 @@ void BotV3::FillAnotherEatsForKing(quadrupleTree* wayTree, PosTurn& pos) {
 	}
 }
 
-//ôóíêöèÿ íàõîæäåíèÿ ìíîæåñòâåííîãî ñúåäåíèÿ äëÿ êàæäîãî õîäà, âûçûâàåòñÿ ïîñëå òîãî, êàê áûëè íàéäåíû õîäû äëÿ ñúåäåíèÿ
+//функция нахождения множественного съедения для каждого хода, вызывается после того, как были найдены ходы для съедения
 void BotV3::FindContinue(std::array<std::array<int, 8>, 8>& Board, std::vector<PosTurn>& movesVec, Positions Col, Positions enemyCol) {
 
 	std::vector<PosTurn> newMoves;
 
-	//äëÿ êàæäîãî õîäà ñúåäåíèÿ
+	//для каждого хода съедения
 	for (auto& pos : movesVec) {
 
-		//ïðîâåðÿåì îáû÷íîé øàøêîé áûë ñäåëàí õîä èëè äàìêîé
+		//проверяем обычной шашкой был сделан ход или дамкой
 		if (Board[pos.from.first][pos.from.second] == static_cast<int>(Col)) {
 
-			//ñîçäàåì äåðåâî ïóòè
+			//создаем дерево пути
 			ternaryTree* wayTree = new ternaryTree(pos.from, pos.to);
 
-			//ñúåäåííûå øàøêè
+			//съеденные шашки
 			std::vector<std::pair<int, int>> enemyPos;
 
-			//äîáàâëÿåì ñúåäåííóþ øàøêó â âåêòîð
+			//добавляем съеденную шашку в вектор
 			auto enemy = std::make_pair(pos.from.first + wayTree->getDX(), pos.from.second + wayTree->getDY());
 			enemyPos.push_back(enemy);
 
-			//âûïîëíÿåì ôóíêöèþ íàõîæäåíèÿ ïóòåé ñúåäåíèÿ øàøåê
+			//выполняем функцию нахождения путей съедения шашек
 			CheckContinue(Board, wayTree, enemyCol, pos.from, enemyPos);
 
-			//çàïîëíÿåì ñàìûì áîëüøèì ïî ãëóáèíå ïóòåì âåêòîð ïóòè
+			//заполняем самым большим по глубине путем вектор пути
 			FillAnotherEats(wayTree, pos);
 
 
-			//çäåñü çàïîëíÿåì âåêòîð âñåõ ñúåäåííûõ øàøåê
+			//здесь заполняем вектор всех съеденных шашек
 			if (!pos.another_eats.empty()) {
 				int dx = (pos.to.first - pos.another_eats[0].first) / 2;
 				int dy = (pos.to.second - pos.another_eats[0].second) / 2;
@@ -767,14 +767,14 @@ void BotV3::FindContinue(std::array<std::array<int, 8>, 8>& Board, std::vector<P
 					pos.whoWasEated.push_back(std::make_pair(x, y));
 				}
 
-				//îöåíèâàåì öåííîñòü õîäà, â çàèâèìîñòè îò êîëè÷åñòâà ñúåäåííûõ øàøåê
+				//оцениваем ценность хода, в заивимости от количества съеденных шашек
 				pos.relevance += pos.another_eats.size() * static_cast<int>(SituationCost::EAT_MORE);
 			}
 		}
 		else if (Board[pos.from.first][pos.from.second] == static_cast<int>(Col) + 2) {
 
 
-			//ñîçäàåì ÷åòâåðíîå äåðåâî
+			//создаем четверное дерево
 			quadrupleTree* wayTree = new quadrupleTree(pos.from, pos.to);
 
 			std::vector<std::pair<int, int>> enemyPos;
@@ -783,30 +783,30 @@ void BotV3::FindContinue(std::array<std::array<int, 8>, 8>& Board, std::vector<P
 			enemyPos.push_back(enemy);
 
 
-			//ïîïûòàåìñÿ íàéòè ïðîäîëæåíèå õîäà äëÿ äàìêè êîòîðàÿ ñúåëà
+			//попытаемся найти продолжение хода для дамки которая съела
 			CheckContinueForKing(Board, wayTree, enemyCol);
 
 			FillAnotherEatsForKing(wayTree, pos);
 
-			//åñëè ñúåëà òî óâåëè÷èâàåì öåííîñòü õîäà â çàèâèñèìîñòè îò êîë-âà ñúåäåííûõ øàøåê
+			//если съела то увеличиваем ценность хода в заивисимости от кол-ва съеденных шашек
 			pos.relevance += pos.another_eats.size() * static_cast<int>(SituationCost::EAT_MORE);
 
 
-			//çäåñü ìû íàõîäèì äîïîëíèòåëüíûå õîäû ïîñëå ñúåäåíèÿ
-			//òàê êàê ïîñëå òîãî êàê ìû ñúåëè ïîñëåäíþþ øàøêó
-			//îñòàþòñÿ äîïîëíèòåëüíûå õîäû äëÿ ïåðåìåùåíèÿ
+			//здесь мы находим дополнительные ходы после съедения
+			//так как после того как мы съели последнюю шашку
+			//остаются дополнительные ходы для перемещения
 			if (!pos.another_eats.empty()) {
 
-				//îïðåäåëÿåì ïîçèöèþ äàìêè â òåêóùèé ìîìåíò ïîñëå ïîñëåäíåãî ñúåäåíèÿ
+				//определяем позицию дамки в текущий момент после последнего съедения
 				int x = pos.another_eats[pos.another_eats.size() - 1].first;
 				int y = pos.another_eats[pos.another_eats.size() - 1].second;
 
-				//îïðåäåëÿåì âåêòîð, ïî êîòîðîìó äàìêà äâèãàëàñü âî âðåìÿ ïîñëåäíåãî ñúåäåíèÿ
+				//определяем вектор, по которому дамка двигалась во время последнего съедения
 				int dx = x - pos.whoWasEated[pos.whoWasEated.size() - 1].first;
 				int dy = y - pos.whoWasEated[pos.whoWasEated.size() - 1].second;
 
 
-				//çàïîëíÿåì âåêòîð äîïîëíèòåëüíûõ õîäîâ, êîïèðóÿ òåêóùèé è èçìåíÿÿ ó íåãî ïîñëåäíèé õîä
+				//заполняем вектор дополнительных ходов, копируя текущий и изменяя у него последний ход
 				while (CheckBorders(x, y, dx, dy) && Board[x + dx][y + dy] == static_cast<int>(Positions::CELL_PLBL)) {
 					PosTurn nextpos = pos;
 					nextpos.another_eats[nextpos.another_eats.size() - 1].first = x + dx;
@@ -821,7 +821,7 @@ void BotV3::FindContinue(std::array<std::array<int, 8>, 8>& Board, std::vector<P
 
 	}
 
-	//çàïîëíÿåì âåêòîð õîäîâ ñîäåðæèìûì âåêòîðà äîïîëíèòåëüíûõ õîäîâ
+	//заполняем вектор ходов содержимым вектора дополнительных ходов
 	if (!newMoves.empty()) {
 		for (int i = 0; i < newMoves.size() - 1; i++) {
 			movesVec.push_back(newMoves[i]);
@@ -830,75 +830,75 @@ void BotV3::FindContinue(std::array<std::array<int, 8>, 8>& Board, std::vector<P
 }
 
 
-//ôóíêöèÿ çàïîëíåíèÿ âåêòîðà õîäîâ âñåâîçìîæíûìè õîäàìè
+//функция заполнения вектора ходов всевозможными ходами
 void BotV3::FillPosTurns(std::array<std::array<int, 8>, 8>& Board, std::vector<PosTurn>& movesVec, Positions Col, Positions enemyCol) {
 
 
-	//íàéäåì âñå âîçìîæíûå õîäû äëÿ ñúåäåíèÿ
+	//найдем все возможные ходы для съедения
 	FindEats(Board, Col, enemyCol, movesVec);
 
-	//åñëè õîäîâ äëÿ ñúåäåíèÿ íåò, èùåì îáû÷íûå õîäû
+	//если ходов для съедения нет, ищем обычные ходы
 	if (movesVec.empty()) {
 		FindMoves(Board, Col, movesVec);
 	}
 	else {
-		//åñëè õîäû äëÿ ñúåäåíèÿ åñòü, èçìåíÿåì ôëàã òîãî, ÷òî áûëè ñúåäåíû øàøêè
+		//если ходы для съедения есть, изменяем флаг того, что были съедены шашки
 		if (enemyCol == color) {
 			canEnemyEat = true;
 		}
-		//íàõîäèì äîïîëíèòåëüíûå ìíîæåñòâåííûå ñúåäåíèÿ
+		//находим дополнительные множественные съедения
 		FindContinue(Board, movesVec, Col, enemyCol);
 	}
 }
 
-//ôóíêöèÿ ïåðåìåùåíèÿ øàøêè ñîïåðíèêà
+//функция перемещения шашки соперника
 void BotV3::TryMoveEnemy
 (std::array<std::array<int, 8>, 8>& Board, std::vector<PosTurn>& movesVec, PosTurn& pos, PosTurn& enemyTurn, Positions Col, Positions enemyCol) {
 
 
-	//åñëè ó ñîïåðíèêà åñòü ìíîæåñòâåííîå ñúåäåíèå
+	//если у соперника есть множественное съедение
 	if (!enemyTurn.another_eats.empty()) {
-		//òî ìåíÿåì ìåñòàìè ÿ÷åéêó îòïðàâëåíèÿ è ñàìóþ ïîñëåäíþþ ÿ÷åéêó
+		//то меняем местами ячейку отправления и самую последнюю ячейку
 		std::swap(Board[enemyTurn.from.first][enemyTurn.from.second],
 			Board[enemyTurn.another_eats[enemyTurn.another_eats.size() - 1].first][enemyTurn.another_eats[enemyTurn.another_eats.size() - 1].second]);
 	}
 	else {
-		//åñëè ìíîæåñòâåííîãî ñúåäåíèÿ íåò, òî ïðîñòî ìåíÿåì ÿ÷åéêó îòêóäà ìåñòàìè ñ ÿ÷åéêîé êóäà
+		//если множественного съедения нет, то просто меняем ячейку откуда местами с ячейкой куда
 		std::swap(Board[enemyTurn.from.first][enemyTurn.from.second], Board[enemyTurn.to.first][enemyTurn.to.second]);
 	}
 
-	//åñëè áûëè ñúåäåíèÿ
+	//если были съедения
 	if (!enemyTurn.whoWasEated.empty()) {
 		for (auto& eated : enemyTurn.whoWasEated) {
-			//òî äëÿ êàæäîé ÿ÷åéêè, ãäå áûëà ñúåäåíà øàøêà âûñòàâëÿåì ïóñòóþ àêòèâíóþ ÿ÷åéêó
+			//то для каждой ячейки, где была съедена шашка выставляем пустую активную ячейку
 			Board[eated.first][eated.second] = static_cast<int>(Positions::CELL_PLBL);
 		}
 	}
 
 	std::vector<PosTurn> movesVecMy;
 
-	//òåïåðü íàõîäèì âîçìîæíûå ñúåäåíèÿ äëÿ ìîèõ øàøåê
+	//теперь находим возможные съедения для моих шашек
 	FindEats(Board, Col, enemyCol, movesVecMy);
 
-	//åñëè îí ïóñòîé
+	//если он пустой
 	if (movesVecMy.empty()) {
-		//òî ïðîñòî íàõîäèì âîçìîæíûå õîäû
+		//то просто находим возможные ходы
 		FindMoves(Board, Col, movesVecMy);
 
 	}
 	else {
-		//åñëè ìîæåì ñúåñòü, òî äîáàâëÿåì ðåéòèíã ê äàííîìó õîäó ñ ïîíèæåííûì êîýôôèöèåíòîì
-		//òàê êàê âåðîÿòíîñòü äàííîãî ñîáûòèÿ îòíîñèòåëüíî ìàëà
+		//если можем съесть, то добавляем рейтинг к данному ходу с пониженным коэффициентом
+		//так как вероятность данного события относительно мала
 		pos.relevance += static_cast<int>(SituationCost::EAT) * movesVecMy.size() / 5;
 
-		//íàõîäèì ìíîæåñòâåííîå ñúåäåíèå
+		//находим множественное съедение
 		FindContinue(Board, movesVecMy, enemyCol, Col);
 
 		for (auto& moves : movesVecMy) {
 
 
 			if (!moves.another_eats.empty()) {
-				//åñëè ìîæåì ñúåñòü, òî äîáàâëÿåì ðåéòèíã ê äàííîìó õîäó ñ ïîíèæåííûì êîýôôèöèåíòîì
+				//если можем съесть, то добавляем рейтинг к данному ходу с пониженным коэффициентом
 				pos.relevance += static_cast<int>(SituationCost::EAT_MORE) * moves.another_eats.size() / 5;
 
 			}
@@ -909,66 +909,66 @@ void BotV3::TryMoveEnemy
 }
 
 
-//ôóíêöèÿ ïåðåìåùåíèÿ è îöåíêè õîäà íà òåñòîâîì ïîëå
+//функция перемещения и оценки хода на тестовом поле
 void BotV3::TryMove(PosTurn& pos, Positions Col, Positions enemyCol) {
 
-	//ñîçäàåì òåñòîâîå ïîëå
+	//создаем тестовое поле
 	auto testBoard = PosBoard;
 
-	//åñëè åñòü ìíîæåñòâåííîå ñúåäåíèå
+	//если есть множественное съедение
 	if (!pos.another_eats.empty()) {
 
-		//òî ìåíÿåì ìåñòàìè ÿ÷åéêó îòïðàâëåíèÿ è ñàìóþ ïîñëåäíþþ ÿ÷åéêó
+		//то меняем местами ячейку отправления и самую последнюю ячейку
 		std::swap(testBoard[pos.from.first][pos.from.second],
 			testBoard[pos.another_eats[pos.another_eats.size() - 1].first][pos.another_eats[pos.another_eats.size() - 1].second]);
 	}
 	else {
 
-		//åñëè ìíîæåñòâåííîãî ñúåäåíèÿ íåò, òî ïðîñòî ìåíÿåì ÿ÷åéêó îòêóäà ìåñòàìè ñ ÿ÷åéêîé êóäà
+		//если множественного съедения нет, то просто меняем ячейку откуда местами с ячейкой куда
 		std::swap(testBoard[pos.from.first][pos.from.second], testBoard[pos.to.first][pos.to.second]);
 	}
 
-	//åñëè áûëè ñúåäåíèÿ
+	//если были съедения
 	if (!pos.whoWasEated.empty()) {
 		for (auto& eated : pos.whoWasEated) {
-			//òî äëÿ êàæäîé ÿ÷åéêè, ãäå áûëà ñúåäåíà øàøêà âûñòàâëÿåì ïóñòóþ àêòèâíóþ ÿ÷åéêó
+			//то для каждой ячейки, где была съедена шашка выставляем пустую активную ячейку
 			testBoard[eated.first][eated.second] = static_cast<int>(Positions::CELL_PLBL);
 		}
 	}
 
-	//âåêòîð õîäîâ ñîïåðíèêà
+	//вектор ходов соперника
 	std::vector<PosTurn> movesVecEnemy;
 
-	//íàéäåì õîäû ñúåäåíèÿ äëÿ ñîïåðíèêà
+	//найдем ходы съедения для соперника
 	FindEats(testBoard, enemyCol, Col, movesVecEnemy);
 
 
-	//åñëè õîäû ïóñòûå
+	//если ходы пустые
 	if (movesVecEnemy.empty()) {
 		if (canEnemyEat == true) {
-			//äîáàâëÿåì ðàçíèöó â âîçìîæíûõ ñúåäåíèÿõ óìíîæåííûõ íà êîýôôèöèåíò ñîõðàíåíèÿ øàøêè
+			//добавляем разницу в возможных съедениях умноженных на коэффициент сохранения шашки
 			pos.relevance += static_cast<int>(SituationCost::SAVE) * PosMovesEnemy.size();
 		}
 
-		//íàõîäèì âîçìîæíûå õîäû
+		//находим возможные ходы
 		FindMoves(testBoard, Col, movesVecEnemy);
 
-		//äîáàâëÿåì ðàçíèöó â âîçìîæíûõ õîäàõ äî è ïîñëå íàøåãî õîäà ïîìíîæåííîãî íà êîýôôèöèåíò áëîêèðîâêè õîäà
+		//добавляем разницу в возможных ходах до и после нашего хода помноженного на коэффициент блокировки хода
 		pos.relevance += static_cast<int>(SituationCost::BLOCK) * (PosMovesEnemy.size() - movesVecEnemy.size());
 	}
 	else {
 
-		//åñëè ñúåäåíèå áûëî, òî ýòîò õîä íå òàê õîðîø, è óáàâëÿåì ðåéòèíã â çàâèñèìîñòè îò ÷èñëà õîäîâ, êîòîðûå ìîãóò åñòü
+		//если съедение было, то этот ход не так хорош, и убавляем рейтинг в зависимости от числа ходов, которые могут есть
 		pos.relevance += static_cast<int>(SituationCost::DIE) * movesVecEnemy.size();
 
-		//íàõîäèì ìíîæåñòâåííûå ñúåäåíèÿ
+		//находим множественные съедения
 		FindContinue(testBoard, movesVecEnemy, enemyCol, Col);
 
 		for (auto& moves : movesVecEnemy) {
 
 
 			if (!moves.another_eats.empty()) {
-				//åñëè ìíîæåñòâåííûå ñúåäåíèÿ åñòü, òî òàê æå èçìåíÿåì ðåéòèíã â õóäøóþ ñòîðîíó
+				//если множественные съедения есть, то так же изменяем рейтинг в худшую сторону
 				pos.relevance += static_cast<int>(SituationCost::DIE_MORE) * moves.another_eats.size();
 
 			}
@@ -979,14 +979,14 @@ void BotV3::TryMove(PosTurn& pos, Positions Col, Positions enemyCol) {
 
 	}
 
-	//òåïåðü ïðîèçâîäèì ïåðåäâèæåíèå êàæäûì õîäîì ñîïåðíèêà
+	//теперь производим передвижение каждым ходом соперника
 	for (auto& enemyTurn : movesVecEnemy) {
 		TryMoveEnemy(testBoard, movesVecEnemy, pos, enemyTurn, Col, enemyCol);
 	}
 }
 
 void BotV3::TryMoveAllPoss(std::vector<PosTurn>& movesVec, Positions Col, Positions enemyCol) {
-	//ïûòàåìñÿ ñõîäèòü êàæäûì õîäîì, ÷òîáû ïðîèçâåñòè îöåíêó
+	//пытаемся сходить каждым ходом, чтобы произвести оценку
 	//Timer t;
 	for (auto& pos : movesVec) {
 		TryMove(pos, Col, enemyCol);
@@ -994,7 +994,7 @@ void BotV3::TryMoveAllPoss(std::vector<PosTurn>& movesVec, Positions Col, Positi
 }
 
 /*void BotV3::TryMoveAllPoss(std::vector<PosTurn>& movesVec, Positions Col, Positions enemyCol) {
-	//ïûòàåìñÿ ñõîäèòü êàæäûì õîäîì, ÷òîáû ïðîèçâåñòè îöåíêó
+	//пытаемся сходить каждым ходом, чтобы произвести оценку
 
 	std::vector<std::future<void>> vecAsy(movesVec.size());
 
@@ -1009,21 +1009,21 @@ void BotV3::TryMoveAllPoss(std::vector<PosTurn>& movesVec, Positions Col, Positi
 
 
 
-//ôóíêöèÿ âîçâðàùåíèÿ ñàìîãî ðåéòèíãîâîãî õîäà
+//функция возвращения самого рейтингового хода
 BotV3::PosTurn BotV3::ReturnMove() {
 
-	//çàïîëíÿåì âåêòîðà ìîèõ õîäîâ è âîçìîæíûõ õîäîâ ñîïåðíèêà
+	//заполняем вектора моих ходов и возможных ходов соперника
 	FillPosTurns(PosBoard, PosMoves, color, enemycolor);
 	FillPosTurns(PosBoard, PosMovesEnemy, enemycolor, color);
 
-	//ïðîçèâîäèì îöåíêó âñåì íàøèì âîçìîæíûì õîäàì
+	//прозиводим оценку всем нашим возможным ходам
 	TryMoveAllPoss(PosMoves, color, enemycolor);
 
 	std::vector<PosTurn> moves;
 	PosTurn max;
 	max.relevance = INT_MIN;
 
-	//âû÷èñëÿåì ìàêñèìàëüíûé õîä ïî ðåéòèíãó
+	//вычисляем максимальный ход по рейтингу
 	for (auto& move : PosMoves) {
 		if (move.relevance > max.relevance) {
 			max = move;
@@ -1031,7 +1031,7 @@ BotV3::PosTurn BotV3::ReturnMove() {
 	}
 
 
-	//åñëè åñòü îäèíàêîâûå õîäû ïî ðåéòèíãó, çàïîëíÿåì èìè âåêòîð õîäîâ
+	//если есть одинаковые ходы по рейтингу, заполняем ими вектор ходов
 	for (auto& move : PosMoves) {
 		if (move.relevance == max.relevance) {
 			moves.push_back(move);
@@ -1040,11 +1040,11 @@ BotV3::PosTurn BotV3::ReturnMove() {
 	moves.push_back(max);
 
 	srand(time(NULL));
-	//åñëè åñòü ðàâíûå ïî öåííîñòè õîäû, âîçâðàùàåì ñëó÷àéíûé èç íèõ
+	//если есть равные по ценности ходы, возвращаем случайный из них
 	if (moves.size() > 1) {
 		int randomINDEX = rand() % (moves.size() - 1);
 		return moves[randomINDEX];
-	}//åñëè íåò, òî ñàìûé ïåðâûé
+	}//если нет, то самый первый
 	else if (moves.size() == 1) {
 		return moves[0];
 	}
