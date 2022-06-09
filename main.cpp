@@ -11,7 +11,7 @@ LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
 void EnableOpenGL(HWND hwnd, HDC*, HGLRC*);
 void DisableOpenGL(HWND, HDC, HGLRC);
 
-//Ô-ÿ âîçâðàùàåò êîîðäèíàòó òâîåãî êëèêà ïî êàðòå
+//Ð¤-Ñ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ñƒ Ñ‚Ð²Ð¾ÐµÐ³Ð¾ ÐºÐ»Ð¸ÐºÐ° Ð¿Ð¾ ÐºÐ°Ñ€Ñ‚Ðµ
 void ScreenToOpenGL(HWND hwnd, int x, int y, float* ox, float* oy) {
 	RECT rct;
 	GetClientRect(hwnd, &rct);
@@ -19,7 +19,7 @@ void ScreenToOpenGL(HWND hwnd, int x, int y, float* ox, float* oy) {
 	*oy = playboard.getH() - y / (float)rct.bottom * playboard.getH();
 }
 
-//Ïðîâåðêà êëèêíóëè ëè ìû íà äîñêó èëè âíå ãðàíèö êàðòû
+//ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° ÐºÐ»Ð¸ÐºÐ½ÑƒÐ»Ð¸ Ð»Ð¸ Ð¼Ñ‹ Ð½Ð° Ð´Ð¾ÑÐºÑƒ Ð¸Ð»Ð¸ Ð²Ð½Ðµ Ð³Ñ€Ð°Ð½Ð¸Ñ† ÐºÐ°Ñ€Ñ‚Ñ‹
 bool IsCellInMap(int x, int y) {
 	return (x >= 0) && (y >= 0) && (x <= playboard.getW()) && (y <= playboard.getH());
 }
@@ -114,7 +114,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	/* create main window */
 	hwnd = CreateWindowEx(0,
 		(LPCWSTR)"GLSample",
-		TEXT("Ðóññêèå øàøêè"),
+		TEXT("Ð ÑƒÑÑÐºÐ¸Ðµ ÑˆÐ°ÑˆÐºÐ¸"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -130,10 +130,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	/* enable OpenGL for the window */
 	EnableOpenGL(hwnd, &hDC, &hRC);
 
-	glScalef(float(512) / float(512), 1, 1); //ôóíêöèÿ ìàñøòàáèðîâàíèÿ ýêðàíà,
-	// ðàñòÿãèâàåò ñæèìàåò èëè îòðàæàåò ïî îñÿì õ ó z
+	glScalef(float(512) / float(512), 1, 1); //Ñ„ÑƒÐ½ÐºÑ†Ð¸Ñ Ð¼Ð°ÑÑˆÑ‚Ð°Ð±Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ ÑÐºÑ€Ð°Ð½Ð°,
+	// Ñ€Ð°ÑÑ‚ÑÐ³Ð¸Ð²Ð°ÐµÑ‚ ÑÐ¶Ð¸Ð¼Ð°ÐµÑ‚ Ð¸Ð»Ð¸ Ð¾Ñ‚Ñ€Ð°Ð¶Ð°ÐµÑ‚ Ð¿Ð¾ Ð¾ÑÑÐ¼ Ñ… Ñƒ z
 
-	AllocConsole(); // îòêðûâàåì êîíñîëü, êóäà áóäåì çàïèñûâàòü ñ÷åò, õîä èãðû è ïðî÷åå ÷åðåç cout
+	AllocConsole(); // Ð¾Ñ‚ÐºÑ€Ñ‹Ð²Ð°ÐµÐ¼ ÐºÐ¾Ð½ÑÐ¾Ð»ÑŒ, ÐºÑƒÐ´Ð° Ð±ÑƒÐ´ÐµÐ¼ Ð·Ð°Ð¿Ð¸ÑÑ‹Ð²Ð°Ñ‚ÑŒ ÑÑ‡ÐµÑ‚, Ñ…Ð¾Ð´ Ð¸Ð³Ñ€Ñ‹ Ð¸ Ð¿Ñ€Ð¾Ñ‡ÐµÐµ Ñ‡ÐµÑ€ÐµÐ· cout
 	freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
 	freopen_s((FILE**)stdin, "CONIN$", "r", stdin);
 	std::cout << "GAME RUSSIAN CHECKERS" << std::endl;
